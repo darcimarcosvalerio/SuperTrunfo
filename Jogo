@@ -1,0 +1,267 @@
+// Jogo.java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+public class Jogo {
+    private List<Jogador> jogadores;
+    private Baralho baralho;
+    private Scanner scanner;
+    private int indiceJogadorAtual;
+    private List<Carta> potesDeEmpate; // Para armazenar cartas em caso de empate
+
+    public Jogo(List<Jogador> jogadores, Baralho baralho) {
+        this.jogadores = jogadores;
+        this.baralho = baralho;
+        this.scanner = new Scanner(System.in);
+        this.indiceJogadorAtual = 0; // O Jogador 1 (primeiro da lista) começa
+        this.potesDeEmpate = new ArrayList<>();
+    }
+
+    public void configurarJogo(int cartasPorJogador) {
+        baralho.embaralhar();
+        for (Jogador jogador : jogadores) {
+            jogador.adicionarCartas(baralho.distribuir(cartasPorJogador));
+            System.out.println(jogador.getNome() + " recebeu " + cartasPorJogador + " cartas.");
+        }
+    }
+
+    public void iniciarJogo() {
+        System.out.println("\n--- Jogo Super Trunfo Iniciado ---");
+
+        while (true) {
+            Jogador jogadorAtual = jogadores.get(indiceJogadorAtual);
+            System.out.println("\n--- Vez de " + jogadorAtual.getNome() + " ---");
+
+            if (!jogadorAtual.temCartas()) {
+                System.out.println(jogadorAtual.getNome() + " não tem mais cartas. Pulando turno.");
+                // Verifica se sobrou apenas um jogador com cartas
+                List<Jogador> jogadoresComCartas = jogadores.stream()
+                                                    .filter(Jogador::temCartas)
+                                                    .collect(Collectors.toList());
+                if (jogadoresComCartas.size() <= 1) {
+                    finalizarJogo(jogadoresComCartas.isEmpty() ? null : jogadoresComCartas.get(0));
+                    break;
+                }
+                proximoTurno(); // Vai para o próximo jogador
+                continue;
+            }
+
+            Carta cartaDoJogador = jogadorAtual.getMao().get(0); // Jogador joga sua carta do topo
+            System.out.println(jogadorAtual.getNome() + " joga:");
+            cartaDoJogador.exibir();
+
+            // Pega os atributos disponíveis da carta do jogador atual
+            Set<String> atributosDisponiveis = cartaDoJogador.getAtributos().keySet();
+            System.out.println("\nEscolha um atributo para comparar (ex: " + String.join(", ", atributosDisponiveis) + "):");
+            String atributoEscolhido = scanner.nextLine().trim().toLowerCase();
+
+            // Valida o atributo escolhido
+            if (!atributosDisponiveis.contains(atributoEscolhido)) {
+                System.out.println("Atributo inválido. Por favor, escolha entre: " + String.join(", ", atributosDisponiveis));
+                continue; // Pede novamente para o jogador atual
+            }
+
+            // Coleta as cartas de todos os jogadores ativos para esta rodada
+            List<Carta> cartasNaRodada = new ArrayList<>();
+            List<Jogador> jogadoresAtivos = new ArrayList<>(); // Jogadores que ainda têm cartas para esta rodada
+            for (Jogador j : jogadores) {
+                if (j.temCartas()) {
+                    jogadoresAtivos.add(j);
+                    cartasNaRodada.add(j.getMao().get(0)); // Pega a carta do topo sem remover ainda
+                }
+            }
+
+            if (jogadoresAtivos.size() < 2) {
+                 // O jogo pode ter terminado ou está prestes a terminar
+                finalizarJogo(jogadoresAtivos.isEmpty() ? null : jogadoresAtivos.get(0));
+                break;
+            }
+
+            System.out.println("\n--- Comparando por: " + atributoEscolhido.toUpperCase() + " ---");
+            Carta cartaVencedoraDaRodada = cartaDoJogador; // Assume que a carta do jogador atual ganha inicialmente
+            Jogador vencedorDaRodada = jogadorAtual;
+            List<Carta> cartasEmpatadas = new ArrayList<>();
+            cartasEmpatadas.add(cartaDoJogador); // Adiciona a carta do jogador atual ao pote de empate se ele for o primeiro a empatar
+
+            // Exibe todas as cartas jogadas na rodada e encontra o vencedor
+            for (int i = 0; i < jogadoresAtivos.size(); i++) {
+                Jogador j = jogadoresAtivos.get(i);
+                Carta c = cartasNaRodada.get(i);
+                String nomeAtributoFormatado = atributoEscolhido.substring(0, 1).toUpperCase() + atributoEscolhido.substring(1);
+                System.out.println(j.getNome() + "'s carta (" + c.getNome() + ") tem " + nomeAtributoFormatado + ": " + c.getValorAtributo(atributoEscolhido));
+
+                if (j != jogadorAtual) { // Compara com a carta que está ganhando até agora
+                    int resultadoComparacao = c.compararCom(cartaVencedoraDaRodada, atributoEscolhido);
+                    if (resultadoComparacao == 1) { // A carta 'c' vence a cartaVencedoraDaRodada atual
+                        cartaVencedoraDaRodada = c;
+                        vencedorDaRodada = j;
+                        cartasEmpatadas.clear(); // Reinicia lista de empate
+                        cartasEmpatadas.add(c);
+                    } else if (resultadoComparacao == 0) { // É um empate com a cartaVencedoraDaRodada atual
+                        cartasEmpatadas.add(c);
+                    }
+                }
+            }
+
+            // Agora, de fato, remove as cartas das mãos dos jogadores
+            for (Jogador j : jogadoresAtivos) {
+                j.jogarCarta(); // Remove a carta do topo
+            }
+
+            if (cartasEmpatadas.size() > 1 && cartaVencedoraDaRodada.compararCom(cartasEmpatadas.get(0), atributoEscolhido) == 0) { // Se houve um empate real entre as melhores cartas
+                System.out.println("\nÉ um EMPATE! As cartas vão para o pote.");
+                potesDeEmpate.addAll(cartasNaRodada); // Todas as cartas da rodada vão para o pote de empate
+                System.out.println("O jogador atual (" + jogadorAtual.getNome() + ") permanece o mesmo para a próxima rodada para desempatar.");
+                // Não muda o indiceJogadorAtual, o loop continua para o mesmo jogador escolher novamente.
+            } else {
+                System.out.println("\n" + vencedorDaRodada.getNome() + " vence a rodada!");
+                vencedorDaRodada.adicionarCartas(cartasNaRodada); // O vencedor coleta todas as cartas da rodada
+                if (!potesDeEmpate.isEmpty()) {
+                    System.out.println(vencedorDaRodada.getNome() + " também leva as " + potesDeEmpate.size() + " cartas do pote!");
+                    vencedorDaRodada.adicionarCartas(potesDeEmpate);
+                    potesDeEmpate.clear();
+                }
+                System.out.println(vencedorDaRodada.getNome() + " agora tem " + vencedorDaRodada.getTamanhoMao() + " cartas.");
+                // O vencedor da rodada se torna o próximo jogador
+                indiceJogadorAtual = jogadores.indexOf(vencedorDaRodada);
+            }
+
+            // Verifica se sobrou apenas um jogador com cartas
+            List<Jogador> jogadoresRestantes = jogadores.stream()
+                                                 .filter(Jogador::temCartas)
+                                                 .collect(Collectors.toList());
+
+            if (jogadoresRestantes.size() <= 1) {
+                finalizarJogo(jogadoresRestantes.isEmpty() ? null : jogadoresRestantes.get(0));
+                break;
+            }
+            proximoTurno(); // Move para o próximo jogador se não foi um empate ou se o vencedor precisa ser ajustado
+        }
+    }
+
+    private void proximoTurno() {
+        indiceJogadorAtual = (indiceJogadorAtual + 1) % jogadores.size();
+        // Garante que o próximo jogador realmente tenha cartas
+        int indiceOriginal = indiceJogadorAtual;
+        while (!jogadores.get(indiceJogadorAtual).temCartas()) {
+            indiceJogadorAtual = (indiceJogadorAtual + 1) % jogadores.size();
+            if (indiceJogadorAtual == indiceOriginal) {
+                // Deu a volta em todos os jogadores e nenhum tem cartas, ou só um tem cartas
+                break;
+            }
+        }
+    }
+
+    private void finalizarJogo(Jogador vencedor) {
+        System.out.println("\n--- Fim de Jogo ---");
+        if (vencedor != null) {
+            System.out.println(vencedor.getNome() + " venceu o jogo Super Trunfo com " + vencedor.getTamanhoMao() + " cartas!");
+        } else {
+            System.out.println("É um empate, ou ninguém tem mais cartas!");
+        }
+        scanner.close();
+    }
+
+    public static void main(String[] args) {
+        // --- Criar Cartas ---
+        Baralho baralhoDoJogo = new Baralho();
+
+        // Exemplos de cartas de carros (você pode criar qualquer tema!)
+        Carta carta1 = new Carta("Ferrari F40");
+        carta1.adicionarAtributo("Velocidade", 324.0); // km/h
+        carta1.adicionarAtributo("Potencia", 471.0); // hp
+        carta1.adicionarAtributo("Peso", 1100.0); // kg
+        baralhoDoJogo.adicionarCarta(carta1);
+
+        Carta carta2 = new Carta("Porsche 911 GT3 RS");
+        carta2.adicionarAtributo("Velocidade", 312.0);
+        carta2.adicionarAtributo("Potencia", 520.0);
+        carta2.adicionarAtributo("Peso", 1430.0);
+        baralhoDoJogo.adicionarCarta(carta2);
+
+        Carta carta3 = new Carta("Lamborghini Aventador");
+        carta3.adicionarAtributo("Velocidade", 350.0);
+        carta3.adicionarAtributo("Potencia", 740.0);
+        carta3.adicionarAtributo("Peso", 1575.0);
+        baralhoDoJogo.adicionarCarta(carta3);
+
+        Carta carta4 = new Carta("Bugatti Chiron");
+        carta4.adicionarAtributo("Velocidade", 420.0);
+        carta4.adicionarAtributo("Potencia", 1500.0);
+        carta4.adicionarAtributo("Peso", 1996.0);
+        baralhoDoJogo.adicionarCarta(carta4);
+
+        Carta carta5 = new Carta("McLaren P1");
+        carta5.adicionarAtributo("Velocidade", 350.0);
+        carta5.adicionarAtributo("Potencia", 916.0);
+        carta5.adicionarAtributo("Peso", 1490.0);
+        baralhoDoJogo.adicionarCarta(carta5);
+
+        Carta carta6 = new Carta("Toyota Supra (Mk4)");
+        carta6.adicionarAtributo("Velocidade", 250.0);
+        carta6.adicionarAtributo("Potencia", 320.0);
+        carta6.adicionarAtributo("Peso", 1490.0);
+        baralhoDoJogo.adicionarCarta(carta6);
+
+        Carta carta7 = new Carta("Nissan GT-R R35");
+        carta7.adicionarAtributo("Velocidade", 315.0);
+        carta7.adicionarAtributo("Potencia", 565.0);
+        carta7.adicionarAtributo("Peso", 1750.0);
+        baralhoDoJogo.adicionarCarta(carta7);
+
+        Carta carta8 = new Carta("Ford GT (2017)");
+        carta8.adicionarAtributo("Velocidade", 348.0);
+        carta8.adicionarAtributo("Potencia", 647.0);
+        carta8.adicionarAtributo("Peso", 1385.0);
+        baralhoDoJogo.adicionarCarta(carta8);
+
+        Carta carta9 = new Carta("Koenigsegg Jesko Absolut");
+        carta9.adicionarAtributo("Velocidade", 531.0); // Teórica
+        carta9.adicionarAtributo("Potencia", 1600.0);
+        carta9.adicionarAtributo("Peso", 1320.0);
+        baralhoDoJogo.adicionarCarta(carta9);
+
+        Carta carta10 = new Carta("Rimac Nevera");
+        carta10.adicionarAtributo("Velocidade", 412.0);
+        carta10.adicionarAtributo("Potencia", 1914.0); // HP Elétrico
+        carta10.adicionarAtributo("Peso", 2300.0); // Carro elétrico, muito pesado
+        baralhoDoJogo.adicionarCarta(carta10);
+
+        Carta carta11 = new Carta("Pagani Huayra");
+        carta11.adicionarAtributo("Velocidade", 370.0);
+        carta11.adicionarAtributo("Potencia", 730.0);
+        carta11.adicionarAtributo("Peso", 1350.0);
+        baralhoDoJogo.adicionarCarta(carta11);
+
+        Carta carta12 = new Carta("Aston Martin Valkyrie");
+        carta12.adicionarAtributo("Velocidade", 402.0);
+        carta12.adicionarAtributo("Potencia", 1160.0);
+        carta12.adicionarAtributo("Peso", 1030.0); // Muito leve
+        baralhoDoJogo.adicionarCarta(carta12);
+
+
+        // --- Criar Jogadores ---
+        List<Jogador> jogadoresDoJogo = new ArrayList<>();
+        jogadoresDoJogo.add(new Jogador("Jogador 1 (Você)"));
+        jogadoresDoJogo.add(new Jogador("Jogador Computador")); // Você pode adicionar mais jogadores se quiser
+
+        // --- Inicializar e Iniciar Jogo ---
+        // Garante que o número de cartas no baralho seja divisível pelo número de jogadores
+        // Ou ajuste cartasPorJogador para garantir uma distribuição justa
+        int totalCartas = baralhoDoJogo.tamanho();
+        int numJogadores = jogadoresDoJogo.size();
+        int cartasPorJogador = totalCartas / numJogadores;
+
+        if (totalCartas % numJogadores != 0) {
+            System.out.println("Atenção: Total de cartas (" + totalCartas + ") não é divisível uniformemente pelos jogadores (" + numJogadores + "). Alguns jogadores podem receber uma carta a menos.");
+        }
+
+
+        Jogo jogoSuperTrunfo = new Jogo(jogadoresDoJogo, baralhoDoJogo);
+        jogoSuperTrunfo.configurarJogo(cartasPorJogador);
+        jogoSuperTrunfo.iniciarJogo();
+    }
+}
