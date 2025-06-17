@@ -1,0 +1,62 @@
+// Carta.java
+import java.util.HashMap;
+import java.util.Map;
+
+public class Carta {
+    private String nome;
+    private Map<String, Double> atributos; // Nome do atributo -> valor
+
+    public Carta(String nome) {
+        this.nome = nome;
+        this.atributos = new HashMap<>();
+    }
+
+    public void adicionarAtributo(String nomeAtributo, double valor) {
+        // Armazena em minúsculas para facilitar a busca, capitaliza ao exibir
+        this.atributos.put(nomeAtributo.toLowerCase(), valor);
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public Map<String, Double> getAtributos() {
+        return atributos;
+    }
+
+    // Método para obter o valor de um atributo específico
+    public Double getValorAtributo(String nomeAtributo) {
+        return atributos.get(nomeAtributo.toLowerCase());
+    }
+
+    // Método para exibir a carta
+    public void exibir() {
+        System.out.println("--- " + nome + " ---");
+        for (Map.Entry<String, Double> entrada : atributos.entrySet()) {
+            // Capitaliza a primeira letra do atributo para exibição
+            String nomeFormatado = entrada.getKey().substring(0, 1).toUpperCase() + entrada.getKey().substring(1);
+            System.out.printf("%-15s: %.2f%n", nomeFormatado, entrada.getValue());
+        }
+        System.out.println("--------------------");
+    }
+
+    // Método para comparar duas cartas com base em um dado atributo
+    // Retorna 1 se esta carta ganha, -1 se a outraCarta ganha, 0 se for empate
+    public int compararCom(Carta outraCarta, String nomeAtributo) {
+        Double esteValor = this.getValorAtributo(nomeAtributo);
+        Double outroValor = outraCarta.getValorAtributo(nomeAtributo);
+
+        if (esteValor == null || outroValor == null) {
+            System.err.println("Erro: Atributo '" + nomeAtributo + "' não encontrado em uma ou ambas as cartas.");
+            return 0; // Ou lançar uma exceção
+        }
+
+        if (esteValor > outroValor) {
+            return 1; // Esta carta ganha
+        } else if (esteValor < outroValor) {
+            return -1; // Outra carta ganha
+        } else {
+            return 0; // Empate
+        }
+    }
+}
