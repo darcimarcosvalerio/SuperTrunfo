@@ -1,0 +1,44 @@
+// Jogador.java
+import java.util.ArrayList;
+import java.util.List;
+
+public class Jogador {
+    private String nome;
+    private List<Carta> mao; // A mão do jogador
+
+    public Jogador(String nome) {
+        this.nome = nome;
+        this.mao = new ArrayList<>();
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public List<Carta> getMao() {
+        return mao;
+    }
+
+    public void adicionarCarta(Carta carta) {
+        this.mao.add(carta);
+    }
+
+    public void adicionarCartas(List<Carta> cartasParaAdicionar) {
+        this.mao.addAll(cartasParaAdicionar);
+    }
+
+    public Carta jogarCarta() {
+        if (mao.isEmpty()) {
+            return null; // Não há cartas para jogar
+        }
+        return mao.remove(0); // Joga a carta do topo
+    }
+
+    public int getTamanhoMao() {
+        return mao.size();
+    }
+
+    public boolean temCartas() {
+        return !mao.isEmpty();
+    }
+}
